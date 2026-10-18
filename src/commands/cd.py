@@ -1,20 +1,35 @@
-"""Команда cd — заглушка (этап 1)."""
+"""Команда cd — смена текущей директории."""
 
+from ..vfs import VFS
 from .base import Command
 
 
 class CdCommand(Command):
-    """Команда cd. Пока ничего не делает с VFS."""
+    """Команда cd. Меняет текущую директорию в VFS."""
 
     name = "cd"
 
-    def execute(self, args: list[str]) -> str:
-        """Вернуть строку с именем команды и аргументами.
+    def __init__(self, vfs: VFS) -> None:
+        """Создать команду с доступом к VFS.
 
         Args:
-            args: аргументы, переданные пользователем.
+            vfs: виртуальная файловая система.
+        """
+        self.vfs = vfs
+
+    def execute(self, args: list[str]) -> str:
+        """Выполнить cd.
+
+        Args:
+            args: если пусто — перейти в корень;
+                  иначе первый аргумент — путь.
 
         Returns:
-            Строка вида "cd: ['/home']".
+            Пустая строка (cd ничего не печатает).
+
+        Raises:
+            VFSError: если путь не найден или это не директория.
         """
-        return f"cd: {args}"
+        path = args[0] if args else "/"
+        self.vfs.change_dir(path)
+        return ""

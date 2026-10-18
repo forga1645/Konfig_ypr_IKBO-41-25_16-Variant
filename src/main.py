@@ -1,21 +1,21 @@
 """Точка входа в эмулятор оболочки."""
 
 import sys
-from pathlib import Path
 
-from .config import Config, ConfigError, load
+from .config import ConfigError, load
 from .repl import Repl
 from .startup import StartupError, load_script, run_script
+from .vfs import VFS, VFSError
 
 
 def main(argv: list[str] | None = None) -> int:
     """Запустить эмулятор.
 
     Args:
-        argv: аргументы командной строки (по умолчанию — sys.argv[1:]).
+        argv: аргументы командной строки.
 
     Returns:
-        Код возврата (0 — успех, 1 — ошибка конфигурации).
+        Код возврата (0 — успех, 1 — ошибка).
     """
     try:
         cfg = load(argv)
@@ -23,8 +23,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 1
 
-    vfs_name = _vfs_name(cfg.vfs_path)
-    repl = Repl(vfs_name=vfs_name)
+    vfs_path = cfg.vfs_path
+    if vfs_path is None:
+        print("VFS path is not specified.", file=sys.stderr)
+        return 1
+
+    try:
+        vfs = VFS.from_directory(vfs_path)
+    except VFSError as exc:
+        print(f"VFS error: {exc}", file=sys.stderr)
+        return 1
+
+    repl = Repl(vfs=vfs)
 
     if cfg.script_path is not None:
         try:
@@ -36,20 +46,6 @@ def main(argv: list[str] | None = None) -> int:
 
     repl.run()
     return 0
-
-
-def _vfs_name(path: Path | None) -> str:
-    """Определить имя VFS для приглашения.
-
-    Args:
-        path: путь к VFS (может быть None).
-
-    Returns:
-        Имя VFS: имя папки, либо 'my_vfs' по умолчанию.
-    """
-    if path is None:
-        return "my_vfs"
-    return path.name
 
 
 if __name__ == "__main__":

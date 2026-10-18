@@ -4,28 +4,29 @@ from .commands import get_command
 from .commands.exit import ExitRequested
 from .errors import ShellError, UnknownCommandError
 from .parser import parse
+from .vfs import VFS
 
 
 class Repl:
     """Интерактивный цикл эмулятора оболочки."""
 
-    def __init__(self, vfs_name: str = "my_vfs") -> None:
-        """Создать REPL с заданным именем VFS.
+    def __init__(self, vfs: VFS) -> None:
+        """Создать REPL с заданной VFS.
 
         Args:
-            vfs_name: имя виртуальной ФС, отображается в приглашении.
+            vfs: виртуальная файловая система.
         """
-        self.vfs_name = vfs_name
+        self.vfs = vfs
 
     def prompt(self) -> str:
-        """Сформировать строку приглашения."""
-        return f"{self.vfs_name}> "
+        """Сформировать строку приглашения.
+
+        Имя VFS + текущий путь.
+        """
+        return f"{self.vfs.name}:{self.vfs.pwd()}> "
 
     def process_line(self, line: str) -> None:
-        """Обработать одну строку и напечатать результат.
-
-        В отличие от `handle`, не бросает `ShellError`:
-        ошибки печатаются в stdout. Используется стартовым скриптом.
+        """Обработать строку без прерывания на ошибках.
 
         Args:
             line: сырая строка.
@@ -60,7 +61,7 @@ class Repl:
         """Обработать одну строку ввода.
 
         Args:
-            line: сырая строка от пользователя.
+            line: сырая строка.
 
         Raises:
             ShellError: при ошибках выполнения команды.
@@ -70,10 +71,19 @@ class Repl:
         if parsed is None:
             return
 
-        command = get_command(parsed.name)
+        command = get_command(parsed.name, self.vfs)
         if command is None:
             raise UnknownCommandError(parsed.name)
 
-        result = command.execute(parsed.args)
+        try:
+            result = command.execute(parsed.args)
+        except Exception as exc:
+            # VFSError тоже превращаем в понятное сообщение.
+            from .vfs import VFSError
+            if isinstance(exc, VFSError):
+                print(f"Error: {exc}")
+                return
+            raise
+
         if result:
             print(result)

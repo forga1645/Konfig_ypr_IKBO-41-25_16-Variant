@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-py -m src.main %*
+py -m src.main --config configs/default.toml
 pause

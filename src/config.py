@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    import tomllib  
-except ModuleNotFoundError:  
-    import tomli as tomllib  
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 class ConfigError(Exception):

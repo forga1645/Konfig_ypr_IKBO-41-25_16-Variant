@@ -13,12 +13,5 @@ class ExitCommand(Command):
     name = "exit"
 
     def execute(self, args: list[str]) -> str:
-        """Сигнализировать о завершении работы.
-
-        Args:
-            args: аргументы (игнорируются).
-
-        Raises:
-            ExitRequested: всегда.
-        """
+        """Сигнализировать о завершении работы."""
         raise ExitRequested()

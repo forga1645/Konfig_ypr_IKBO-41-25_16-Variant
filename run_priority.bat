@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
---vfs tests/data/vfs_small   →   --vfs src
+py -m src.main --config configs/default.toml --vfs src
 pause
