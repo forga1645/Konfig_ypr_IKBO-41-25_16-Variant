@@ -1,0 +1,3 @@
+# Python 3.11+ имеет tomllib в стандартной библиотеке.
+# Для Python 3.10 и ниже — tomli.
+tomli>=2.0.1; python_version < "3.11"
