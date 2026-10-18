@@ -1,0 +1,6 @@
+# Конфигурация эмулятора оболочки.
+# Путь к физическому расположению VFS.
+vfs_path = "tests/data/vfs_minimal"
+
+# Путь к стартовому скрипту.
+script_path = "scripts/start.txt"
