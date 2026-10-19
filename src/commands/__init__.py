@@ -6,14 +6,16 @@ from datetime import datetime
 from ..vfs import VFS
 from .base import Command
 from .cd import CdCommand
+from .cp import CpCommand
 from .du import DuCommand
 from .exit import ExitCommand
 from .ls import LsCommand
+from .touch import TouchCommand
 from .uptime import UptimeCommand
+from .vfs_load import VfsLoadCommand
 from .wc import WcCommand
 
 
-# Тип фабрики: принимает VFS и время старта, возвращает команду.
 CommandFactory = Callable[[VFS, datetime], Command]
 
 
@@ -24,6 +26,9 @@ _COMMAND_FACTORIES: dict[str, CommandFactory] = {
     "uptime": lambda vfs, started: UptimeCommand(started),
     "wc": lambda vfs, started: WcCommand(vfs),
     "du": lambda vfs, started: DuCommand(vfs),
+    "cp": lambda vfs, started: CpCommand(vfs),
+    "touch": lambda vfs, started: TouchCommand(vfs),
+    "vfs-load": lambda vfs, started: VfsLoadCommand(vfs),
 }
 
 

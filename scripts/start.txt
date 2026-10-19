@@ -1,25 +1,43 @@
-# Стартовый скрипт эмулятора (этап 4).
+# Стартовый скрипт эмулятора (этап 5).
 
 # Базовые команды
 ls
 ls /
-ls readme.txt
 
 # Навигация
 cd /
 pwd
 
-# Новые команды этапа 4
+# Команды этапа 4
 uptime
 wc readme.txt
 du
 du readme.txt
 
+# Команды этапа 5
+
+# touch — создание файла
+touch newfile.txt
+ls
+
+# cp — копирование файла
+cp newfile.txt copy.txt
+ls
+
+# cp — копирование папки (копия docs)
+cp docs docs_copy
+ls
+
+# vfs-load — загрузка новой VFS
+vfs-load tests/data/vfs_deep
+ls
+
 # Ошибочные команды
 cd /nonexistent
-ls /nonexistent
 wc /nonexistent
-wc
+cp
+touch
+vfs-load /nonexistent
 
 # Возврат
 cd /
