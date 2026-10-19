@@ -27,36 +27,17 @@ class VFSNode:
 
 
 class VFS:
-    """Виртуальная файловая система в памяти.
-
-    Загружается из директории на диске один раз при создании.
-    Все дальнейшие операции работают только с деревом в памяти.
-    """
+    """Виртуальная файловая система в памяти."""
 
     def __init__(self, name: str, root: VFSNode) -> None:
-        """Создать VFS из уже построенного дерева.
-
-        Args:
-            name: имя VFS (для отображения в приглашении).
-            root: корневой узел дерева.
-        """
+        """Создать VFS из уже построенного дерева."""
         self.name = name
         self.root = root
         self.cwd = root
 
     @classmethod
     def from_directory(cls, path: Path) -> "VFS":
-        """Загрузить VFS из директории на диске.
-
-        Args:
-            path: путь к директории.
-
-        Returns:
-            Готовый объект VFS.
-
-        Raises:
-            VFSError: если путь не существует или не директория.
-        """
+        """Загрузить VFS из директории на диске."""
         if not path.exists():
             raise VFSError(f"VFS path not found: {path}")
         if not path.is_dir():
@@ -68,12 +49,7 @@ class VFS:
 
     @classmethod
     def _walk(cls, real_path: Path, node: VFSNode) -> None:
-        """Рекурсивно обойти директорию и заполнить дерево.
-
-        Args:
-            real_path: реальный путь на диске.
-            node: соответствующий узел в VFS.
-        """
+        """Рекурсивно обойти директорию и заполнить дерево."""
         try:
             entries = list(real_path.iterdir())
         except PermissionError as exc:
@@ -96,25 +72,12 @@ class VFS:
                         size=len(content.encode("utf-8")),
                     )
             except OSError:
-                # Пропускаем файлы, которые не удаётся прочитать.
                 continue
 
     # ---- Навигация ----
 
     def resolve(self, path: str) -> VFSNode:
-        """Найти узел по пути.
-
-        Поддерживает абсолютные и относительные пути, '.', '..'.
-
-        Args:
-            path: путь (абсолютный или относительный).
-
-        Returns:
-            Узел VFS.
-
-        Raises:
-            VFSError: если путь не найден или это не директория (для cwd).
-        """
+        """Найти узел по пути."""
         if not path:
             return self.cwd
 
@@ -140,14 +103,7 @@ class VFS:
         return node
 
     def _parent_of(self, target: VFSNode) -> VFSNode | None:
-        """Найти родителя узла, обойдя всё дерево.
-
-        Args:
-            target: узел, чей родитель ищется.
-
-        Returns:
-            Родительский узел или None, если target — корень.
-        """
+        """Найти родителя узла."""
         if target is self.root:
             return None
 
@@ -163,34 +119,17 @@ class VFS:
 
         return search(self.root)
 
-    # ---- Команды ----
+    # ---- Команды этапа 3 ----
 
     def list_dir(self, path: str = "") -> list[str]:
-        """Вернуть список имён в директории.
-
-        Args:
-            path: путь к директории. Пусто — текущая.
-
-        Returns:
-            Отсортированный список имён.
-
-        Raises:
-            VFSError: если путь не найден или это не директория.
-        """
+        """Вернуть список имён в директории."""
         node = self.resolve(path) if path else self.cwd
         if not node.is_dir:
             raise VFSError(f"not a directory: {path or '.'}")
         return sorted(node.children.keys())
 
     def change_dir(self, path: str) -> None:
-        """Сменить текущую директорию.
-
-        Args:
-            path: путь к новой директории.
-
-        Raises:
-            VFSError: если путь не найден или это не директория.
-        """
+        """Сменить текущую директорию."""
         node = self.resolve(path)
         if not node.is_dir:
             raise VFSError(f"not a directory: {path}")
@@ -209,3 +148,54 @@ class VFS:
                 break
             node = parent
         return "/" + "/".join(reversed(parts))
+
+    # ---- Команды этапа 4 ----
+
+    def wc(self, path: str) -> tuple[int, int, int]:
+        """Подсчитать строки, слова и символы в файле.
+
+        Аналог UNIX-команды wc.
+
+        Args:
+            path: путь к файлу.
+
+        Returns:
+            Кортеж (lines, words, chars).
+
+        Raises:
+            VFSError: если файл не найден или это директория.
+        """
+        node = self.resolve(path)
+        if node.is_dir:
+            raise VFSError(f"is a directory: {path}")
+
+        text = node.content
+        lines = text.count("\n")
+        if text and not text.endswith("\n"):
+            lines += 1
+        words = len(text.split())
+        chars = len(text)
+        return lines, words, chars
+
+    def du(self, path: str = "") -> int:
+        """Подсчитать суммарный размер в байтах.
+
+        Для файла — его размер. Для директории — сумма рекурсивно.
+
+        Args:
+            path: путь к файлу или директории.
+
+        Returns:
+            Размер в байтах.
+
+        Raises:
+            VFSError: если путь не найден.
+        """
+        node = self.resolve(path) if path else self.cwd
+        return self._size_of(node)
+
+    def _size_of(self, node: VFSNode) -> int:
+        """Рекурсивно подсчитать размер узла в байтах."""
+        if not node.is_dir:
+            return node.size
+        return sum(self._size_of(child) for child in node.children.values())

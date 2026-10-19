@@ -109,3 +109,32 @@ def test_file_content(vfs: VFS) -> None:
     node = vfs.resolve("file1.txt")
     assert node.content == "hello"
     assert node.size == 5
+
+# Добавь в конец tests/test_vfs.py
+
+
+def test_vfs_wc(vfs: VFS) -> None:
+    """VFS.wc считает строки, слова, символы."""
+    lines, words, chars = vfs.wc("file1.txt")
+    # "hello" — 1 строка, 1 слово, 5 символов
+    assert lines == 1
+    assert words == 1
+    assert chars == 5
+
+
+def test_vfs_wc_directory(vfs: VFS) -> None:
+    """VFS.wc на директории — VFSError."""
+    with pytest.raises(VFSError):
+        vfs.wc("docs")
+
+
+def test_vfs_du_file(vfs: VFS) -> None:
+    """VFS.du на файле — размер."""
+    size = vfs.du("file1.txt")
+    assert size == 5
+
+
+def test_vfs_du_directory(vfs: VFS) -> None:
+    """VFS.du на директории — сумма."""
+    size = vfs.du("docs")
+    assert size > 0

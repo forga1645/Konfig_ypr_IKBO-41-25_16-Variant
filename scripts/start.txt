@@ -1,19 +1,25 @@
-# Стартовый скрипт эмулятора (этап 3).
+# Стартовый скрипт эмулятора (этап 4).
 
 # Базовые команды
 ls
 ls /
-ls src
+ls readme.txt
 
 # Навигация
 cd /
 pwd
-cd tests
-ls
+
+# Новые команды этапа 4
+uptime
+wc readme.txt
+du
+du readme.txt
 
 # Ошибочные команды
 cd /nonexistent
 ls /nonexistent
+wc /nonexistent
+wc
 
 # Возврат
 cd /
