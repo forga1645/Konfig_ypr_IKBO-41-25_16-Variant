@@ -1,5 +1,4 @@
-# Добавь в конец tests/test_vfs.py
-
+"""Тесты виртуальной файловой системы."""
 
 def test_vfs_touch(vfs: VFS) -> None:
     """VFS.touch создаёт файл."""

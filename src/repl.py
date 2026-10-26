@@ -13,12 +13,7 @@ class Repl:
     """Интерактивный цикл эмулятора оболочки."""
 
     def __init__(self, vfs: VFS, started_at: datetime | None = None) -> None:
-        """Создать REPL.
-
-        Args:
-            vfs: виртуальная файловая система.
-            started_at: время старта (по умолчанию — сейчас).
-        """
+        """Создать REPL."""
         self.vfs = vfs
         self.started_at = started_at or datetime.now()
 
@@ -55,7 +50,7 @@ class Repl:
                 print(f"Error: {exc}")
             except VFSError as exc:
                 print(f"Error: {exc}")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 print(f"Unexpected error: {exc}")
 
     def handle(self, line: str) -> None:

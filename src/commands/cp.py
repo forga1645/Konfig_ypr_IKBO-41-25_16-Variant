@@ -3,6 +3,8 @@
 from ..vfs import VFS
 from .base import Command
 
+CP_REQUIRED_ARGS = 2
+
 
 class CpCommand(Command):
     """Команда cp. Копирует файлы и папки внутри VFS."""
@@ -10,26 +12,12 @@ class CpCommand(Command):
     name = "cp"
 
     def __init__(self, vfs: VFS) -> None:
-        """Создать команду с доступом к VFS.
-
-        Args:
-            vfs: виртуальная файловая система.
-        """
+        """Создать команду с доступом к VFS."""
         self.vfs = vfs
 
     def execute(self, args: list[str]) -> str:
-        """Выполнить cp.
-
-        Args:
-            args: два аргумента — источник и назначение.
-
-        Returns:
-            Пустая строка (cp ничего не печатает).
-
-        Raises:
-            VFSError: если аргументов не два.
-        """
-        if len(args) < 2:
-            raise VFSError("cp: missing operand (need source and destination)")
+        """Выполнить cp."""
+        if len(args) < CP_REQUIRED_ARGS:
+            raise VFSError("cp: missing operand")
         self.vfs.cp(args[0], args[1])
         return ""

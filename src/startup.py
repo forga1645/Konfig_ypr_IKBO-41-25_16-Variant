@@ -11,16 +11,7 @@ class StartupError(Exception):
 def load_script(path: Path) -> list[str]:
     """Прочитать стартовый скрипт.
 
-    Пустые строки и строки, начинающиеся с '#', игнорируются.
-
-    Args:
-        path: путь к файлу скрипта.
-
-    Returns:
-        Список строк-команд.
-
-    Raises:
-        StartupError: если файл не найден.
+    Пустые строки и строки с '#' игнорируются.
     """
     if not path.exists():
         raise StartupError(f"startup script not found: {path}")
@@ -38,19 +29,10 @@ def run_script(
     prompt: str,
     handler: Callable[[str], None],
 ) -> None:
-    """Выполнить команды скрипта как диалог.
-
-    Показывает ввод и вывод, имитируя работу пользователя.
-    Ошибочные строки пропускает.
-
-    Args:
-        commands: список команд.
-        prompt: строка приглашения.
-        handler: функция обработки одной строки. Ошибки не пробрасываются.
-    """
+    """Выполнить команды скрипта как диалог."""
     for command in commands:
         print(f"{prompt}{command}")
         try:
             handler(command)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"Error: {exc}")

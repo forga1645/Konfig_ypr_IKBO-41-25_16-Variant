@@ -55,115 +55,81 @@ class VFS:
             raise VFSError(f"permission denied: {real_path}") from exc
 
         for entry in sorted(entries, key=lambda p: p.name):
-            try:
-                if entry.is_dir():
-                    child = VFSNode(name=entry.name, is_dir=True)
-                    node.children[entry.name] = child
-                    cls._walk(entry, child)
-                elif entry.is_file():
-                    content = entry.read_text(
-                        encoding="utf-8", errors="replace"
-                    )
-                    node.children[entry.name] = VFSNode(
-                        name=entry.name,
-                        is_dir=False,
-                        content=content,
-                        size=len(content.encode("utf-8")),
-                    )
-            except OSError:
-                continue
+            cls._process_entry(entry, node)
 
-    # ---- Навигация ----
+    @classmethod
+    def _process_entry(cls, entry: Path, node: VFSNode) -> None:
+        """Обработать один файл или папку."""
+        try:
+            if entry.is_dir():
+                child = VFSNode(name=entry.name, is_dir=True)
+                node.children[entry.name] = child
+                cls._walk(entry, child)
+            elif entry.is_file():
+                cls._process_file(entry, node)
+        except OSError:
+            pass
+
+    @classmethod
+    def _process_file(cls, entry: Path, node: VFSNode) -> None:
+        """Прочитать файл и добавить его в VFS."""
+        content = entry.read_text(encoding="utf-8", errors="replace")
+        node.children[entry.name] = VFSNode(
+            name=entry.name,
+            is_dir=False,
+            content=content,
+            size=len(content.encode("utf-8")),
+        )
+
 
     def resolve(self, path: str) -> VFSNode:
         """Найти узел по пути."""
         if not path:
             return self.cwd
 
-        if path.startswith("/"):
-            node = self.root
-            parts = [p for p in path.split("/") if p]
-        else:
-            node = self.cwd
-            parts = [p for p in path.split("/") if p]
+        node = self.root if path.startswith("/") else self.cwd
+        parts = [p for p in path.split("/") if p]
 
         for part in parts:
-            if part == ".":
-                continue
-            if part == "..":
-                node = self._parent_of(node) or self.root
-                continue
-            if not node.is_dir:
-                raise VFSError(f"not a directory: {path}")
-            child = node.children.get(part)
-            if child is None:
-                raise VFSError(f"no such file or directory: {path}")
-            node = child
+            node = self._step_resolve(node, part, path)
         return node
+
+    def _step_resolve(
+        self, node: VFSNode, part: str, full_path: str
+    ) -> VFSNode:
+        """Сделать один шаг навигации по дереву."""
+        if part == ".":
+            return node
+        if part == "..":
+            return self._parent_of(node) or self.root
+
+        if not node.is_dir:
+            raise VFSError(f"not a directory: {full_path}")
+
+        child = node.children.get(part)
+        if child is None:
+            raise VFSError(f"no such file or directory: {full_path}")
+        return child
 
     def _parent_of(self, target: VFSNode) -> VFSNode | None:
         """Найти родителя узла."""
         if target is self.root:
             return None
+        return self._search_parent(self.root, target)
 
-        def search(node: VFSNode) -> VFSNode | None:
-            for child in node.children.values():
-                if child is target:
-                    return node
-                if child.is_dir:
-                    found = search(child)
-                    if found is not None:
-                        return found
-            return None
+    def _search_parent(
+        self, current: VFSNode, target: VFSNode
+    ) -> VFSNode | None:
+        """Вспомогательный рекурсивный поиск родителя."""
+        for child in current.children.values():
+            if child is target:
+                return current
+            if child.is_dir:
+                found = self._search_parent(child, target)
+                if found is not None:
+                    return found
+        return None
 
-        return search(self.root)
-
-    def _resolve_parent_and_name(self, path: str) -> tuple[VFSNode, str]:
-        """Найти родителя и имя последнего элемента пути.
-
-        Используется для создания новых узлов.
-
-        Args:
-            path: путь к файлу или папке.
-
-        Returns:
-            Кортеж (родительская папка, имя последнего элемента).
-
-        Raises:
-            VFSError: если родительская папка не найдена.
-        """
-        if path.startswith("/"):
-            base = self.root
-            parts = [p for p in path.split("/") if p]
-        else:
-            base = self.cwd
-            parts = [p for p in path.split("/") if p]
-
-        if not parts:
-            raise VFSError(f"invalid path: {path}")
-
-        name = parts[-1]
-        parent_parts = parts[:-1]
-
-        parent = base
-        for part in parent_parts:
-            if part == ".":
-                continue
-            if part == "..":
-                parent = self._parent_of(parent) or self.root
-                continue
-            if not parent.is_dir:
-                raise VFSError(f"not a directory: {path}")
-            child = parent.children.get(part)
-            if child is None:
-                raise VFSError(f"no such file or directory: {path}")
-            parent = child
-
-        if not parent.is_dir:
-            raise VFSError(f"not a directory: {path}")
-        return parent, name
-
-    # ---- Команды этапа 3 ----
 
     def list_dir(self, path: str = "") -> list[str]:
         """Вернуть список имён в директории."""
@@ -171,33 +137,6 @@ class VFS:
         if not node.is_dir:
             raise VFSError(f"not a directory: {path or '.'}")
         return sorted(node.children.keys())
-
-    def list_dir_detailed(
-        self, path: str = "", show_all: bool = False
-    ) -> list[tuple[str, VFSNode]]:
-        """Вернуть список имён и узлов в директории.
-
-        Args:
-            path: путь к директории. Пусто — текущая.
-            show_all: если True — включить скрытые файлы
-                      (начинающиеся с точки).
-
-        Returns:
-            Список пар (имя, узел), отсортированный по имени.
-
-        Raises:
-            VFSError: если путь не найден или это не директория.
-        """
-        node = self.resolve(path) if path else self.cwd
-        if not node.is_dir:
-            raise VFSError(f"not a directory: {path or '.'}")
-
-        items: list[tuple[str, VFSNode]] = []
-        for name, child in node.children.items():
-            if not show_all and name.startswith("."):
-                continue
-            items.append((name, child))
-        return sorted(items, key=lambda pair: pair[0])
 
     def change_dir(self, path: str) -> None:
         """Сменить текущую директорию."""
@@ -220,7 +159,6 @@ class VFS:
             node = parent
         return "/" + "/".join(reversed(parts))
 
-    # ---- Команды этапа 4 ----
 
     def wc(self, path: str) -> tuple[int, int, int]:
         """Подсчитать строки, слова и символы в файле."""
@@ -247,18 +185,9 @@ class VFS:
             return node.size
         return sum(self._size_of(child) for child in node.children.values())
 
-    # ---- Команды этапа 5 ----
 
     def touch(self, path: str) -> None:
-        """Создать пустой файл. Если существует — обновить.
-
-        Args:
-            path: путь к файлу.
-
-        Raises:
-            VFSError: если родительская папка не найдена
-                      или это существующая папка.
-        """
+        """Создать пустой файл."""
         try:
             node = self.resolve(path)
         except VFSError:
@@ -275,27 +204,14 @@ class VFS:
         )
 
     def cp(self, src: str, dst: str) -> None:
-        """Копировать файл или папку внутри VFS.
-
-        Копирование — рекурсивное. Изменения только в памяти.
-
-        Args:
-            src: путь источника.
-            dst: путь назначения.
-
-        Raises:
-            VFSError: если источник не найден, или попытка
-                      скопировать папку в саму себя.
-        """
+        """Копировать файл или папку внутри VFS."""
         src_node = self.resolve(src)
         if src_node is self.root:
             raise VFSError("cannot copy root directory")
 
-        # Проверка: не копируем ли папку внутрь себя.
         if src_node.is_dir and self._is_inside(src_node, dst):
             raise VFSError(f"cannot copy directory into itself: {dst}")
 
-        # Если dst — существующая директория, копируем ВНУТРЬ неё.
         try:
             dst_node = self.resolve(dst)
         except VFSError:
@@ -309,23 +225,16 @@ class VFS:
             target_parent = parent
             target_name = name
 
-        # Проверка на конфликт имён.
         if target_name in target_parent.children:
             raise VFSError(f"already exists: {dst}")
 
         copy = self._deep_copy(src_node, target_name)
         target_parent.children[target_name] = copy
 
-    def _deep_copy(self, node: VFSNode, new_name: str | None = None) -> VFSNode:
-        """Создать глубокую копию узла.
-
-        Args:
-            node: узел-источник.
-            new_name: новое имя (по умолчанию — как у источника).
-
-        Returns:
-            Новый узел с полной копией содержимого.
-        """
+    def _deep_copy(
+        self, node: VFSNode, new_name: str | None = None
+    ) -> VFSNode:
+        """Создать глубокую копию узла."""
         name = new_name if new_name is not None else node.name
         if node.is_dir:
             copy = VFSNode(name=name, is_dir=True)
@@ -340,61 +249,66 @@ class VFS:
         )
 
     def _is_inside(self, parent: VFSNode, dst_path: str) -> bool:
-        """Проверить, находится ли dst_path внутри parent.
-
-        Нужно для запрета копирования папки в саму себя.
-
-        Args:
-            parent: исходная папка.
-            dst_path: путь назначения.
-
-        Returns:
-            True, если dst внутри parent или совпадает с ним.
-        """
+        """Проверить, находится ли dst_path внутри parent."""
         try:
             dst_node = self.resolve(dst_path)
         except VFSError:
-            # Путь ещё не существует — но его родитель мог бы быть внутри.
             try:
                 parent_node, _ = self._resolve_parent_and_name(dst_path)
             except VFSError:
                 return False
             dst_node = parent_node
 
-        # Ищем dst_node среди потомков parent.
-        def contains(root: VFSNode, target: VFSNode) -> bool:
-            if root is target:
-                return True
-            if not root.is_dir:
-                return False
-            return any(contains(c, target) for c in root.children.values())
+        return self._contains_node(parent, dst_node)
 
-        return contains(parent, dst_node)
+    def _contains_node(self, root: VFSNode, target: VFSNode) -> bool:
+        """Рекурсивно проверить, есть ли target внутри root."""
+        if root is target:
+            return True
+        if not root.is_dir:
+            return False
+        return any(
+            self._contains_node(c, target) for c in root.children.values()
+        )
+
+    def _resolve_parent_and_name(self, path: str) -> tuple[VFSNode, str]:
+        """Найти родителя и имя последнего элемента пути."""
+        if path.startswith("/"):
+            base = self.root
+            parts = [p for p in path.split("/") if p]
+        else:
+            base = self.cwd
+            parts = [p for p in path.split("/") if p]
+
+        if not parts:
+            raise VFSError(f"invalid path: {path}")
+
+        name = parts[-1]
+        parent = base
+        for part in parts[:-1]:
+            parent = self._step_parent_resolve(parent, part, path)
+
+        if not parent.is_dir:
+            raise VFSError(f"not a directory: {path}")
+        return parent, name
+
+    def _step_parent_resolve(
+        self, parent: VFSNode, part: str, full_path: str
+    ) -> VFSNode:
+        """Шаг навигации при поиске родителя."""
+        if part == ".":
+            return parent
+        if part == "..":
+            return self._parent_of(parent) or self.root
+        if not parent.is_dir:
+            raise VFSError(f"not a directory: {full_path}")
+        child = parent.children.get(part)
+        if child is None:
+            raise VFSError(f"no such file or directory: {full_path}")
+        return child
 
     def replace_root(self, new_root: VFSNode, new_name: str) -> None:
-        """Заменить корень VFS целиком (для vfs-load).
-
-        Args:
-            new_root: новый корневой узел.
-            new_name: новое имя VFS.
-        """
+        """Заменить корень VFS целиком."""
         self.root = new_root
         self.cwd = new_root
         self.name = new_name
-
-def human_size(size: int) -> str:
-    """Преобразовать размер в человекочитаемый вид.
-
-    Args:
-        size: размер в байтах.
-
-    Returns:
-        Строка вида "123", "1.2K", "3.5M", "2.0G".
-    """
-    if size < 1024:
-        return str(size)
-    for unit in ("K", "M", "G", "T"):
-        size /= 1024.0
-        if size < 1024:
-            return f"{size:.1f}{unit}"
-    return f"{size:.1f}P"
